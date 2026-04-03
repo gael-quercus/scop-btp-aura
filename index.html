@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUERCUS COOPÃRATION - Cartographie SCOP BTP AURA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f5f9f5; color: #333; }
+
+        .navbar {
+            height: 70px; background: white;
+            border-top: 3px solid;
+            border-image: linear-gradient(90deg, #44a943, #e37142, #1a73a7, #e8a832) 1;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex; align-items: center; padding: 0 30px;
+            position: sticky; top: 0; z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .navbar-brand { display: flex; align-items: center; gap: 15px; margin-right: 40px; }
+        .navbar-logo {
+            width: 50px; height: 50px;
+            background: linear-gradient(135deg, #2d6a4f, #44a943);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+            font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: white;
+        }
+        .navbar-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: #2d6a4f; }
+        .navbar-tagline { font-size: 11px; color: #888; font-style: italic; margin-top: 2px; }
+        .tabs { display: flex; gap: 0; margin-left: auto; }
+        .tab-button {
+            padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+            font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14px; color: #888;
+            border-bottom: 3px solid transparent; transition: all 0.3s ease;
+        }
+        .tab-button.active { color: #e37142; border-bottom-color: #e37142; }
+        .tab-button:hover { color: #e37142; }
+
+        .tab-content { display: none; height: calc(100vh - 70px); }
+        .tab-content.active { display: flex; }
+
+        .map-container { display: flex; height: 100%; width: 100%; }
+        .sidebar {
+            width: 320px; background: white; border-right: 1px solid #e0e0e0;
+            overflow-y: auto; padding: 20px; display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .map-wrap { flex: 1; position: relative; }
+        #mapTrades, #mapReferences { height: calc(100vh - 70px); min-height: 500px; width: 100%; }
+
+        .search-box { margin-bottom: 15px; }
+        .search-box input {
+            width: 100%; padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 14px; font-family: 'Inter', sans-serif;
+        }
+        .search-box input:focus { outline: none; border-color: #44a943; box-shadow: 0 0 0 3px rgba(68,169,67,0.15); }
+
+        .categories { margin-bottom: 15px; }
+        .category-group { margin-bottom: 10px; }
+        .category-header {
+            display: flex; align-items: center; cursor: pointer; user-select: none;
+            margin-bottom: 6px; padding: 8px; border-radius: 6px; transition: background 0.2s;
+        }
+        .category-header:hover { background: #f5f5f5; }
+        .category-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; }
+        .category-label { font-weight: 600; font-size: 13px; flex: 1; color: #333; }
+        .category-toggle {
+            width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: #44a943; margin-right: 10px; transition: all 0.2s;
+        }
+        .category-toggle.checked { background: #44a943; color: white; border-color: #44a943; }
+        .trades { display: none; margin-left: 30px; margin-bottom: 10px; border-left: 2px solid #e0e0e0; padding-left: 10px; }
+        .trades.open { display: block; }
+        .trade-item {
+            display: flex; align-items: center; margin-bottom: 6px; font-size: 13px;
+            padding: 4px; border-radius: 4px; cursor: pointer; transition: background 0.2s;
+        }
+        .trade-item:hover { background: #f9f9f9; }
+        .trade-checkbox {
+            width: 16px; height: 16px; border: 2px solid #ccc; border-radius: 3px;
+            margin-right: 8px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; cursor: pointer;
+        }
+        .trade-checkbox.checked { background: #44a943; border-color: #44a943; color: white; font-size: 10px; }
+
+        .filter-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .pill {
+            padding: 5px 10px; border: 1px solid #ddd; border-radius: 20px;
+            font-size: 11px; background: white; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+        }
+        .pill:hover { border-color: #e37142; background: #fff5f0; }
+        .pill.active { background: #e37142; color: white; border-color: #e37142; }
+
+        .filter-group { margin-bottom: 12px; }
+        .filter-label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; }
+        .filter-select {
+            width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; font-family: 'Inter', sans-serif; background: white; cursor: pointer;
+        }
+        .filter-select:focus { outline: none; border-color: #44a943; box-shadow: 0 0 0 3px rgba(68,169,67,0.15); }
+
+        .year-range { display: flex; gap: 8px; margin-bottom: 12px; }
+        .year-range input {
+            flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
+        }
+
+        .stats-bar {
+            margin-top: auto; padding-top: 12px; border-top: 1px solid #e0e0e0;
+            display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #666;
+        }
+        .stat-item { display: flex; justify-content: space-between; }
+        .stat-value { font-weight: 600; color: #333; }
+
+        .btn {
+            padding: 10px 15px; border: none; border-radius: 8px;
+            font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-primary { background: linear-gradient(135deg, #44a943, #2d6a4f); color: white; }
+        .btn-primary:hover { background: linear-gradient(135deg, #3a8f3a, #245a42); }
+        .btn-secondary { background: white; color: #44a943; border: 1px solid #44a943; }
+        .btn-secondary:hover { background: #f5f5f5; }
+
+        .detail-panel {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 350px;
+            background: white; border-left: 1px solid #e0e0e0;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1); z-index: 500;
+            overflow-y: auto; padding: 20px;
+            transform: translateX(100%); transition: transform 0.3s ease;
+        }
+        .detail-panel.open { transform: translateX(0); }
+        .detail-close {
+            position: absolute; top: 15px; right: 15px; width: 30px; height: 30px;
+            border: none; background: #f5f5f5; border-radius: 50%; cursor: pointer; font-size: 18px; color: #333;
+        }
+        .detail-close:hover { background: #e0e0e0; }
+        .detail-title { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 15px; padding-right: 30px; }
+        .detail-field { margin-bottom: 15px; }
+        .detail-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+        .detail-value { font-size: 14px; color: #333; line-height: 1.4; }
+        .detail-tag {
+            display: inline-block; padding: 4px 10px; border-radius: 12px;
+            font-size: 12px; margin-right: 6px; margin-bottom: 6px; background: #f0f0f0; color: #333;
+        }
+
+        .list-container {
+            display: flex; flex-direction: column; height: 100%; width: 100%;
+        }
+        .list-toolbar {
+            padding: 20px; background: white; border-bottom: 1px solid #e0e0e0;
+        }
+        .list-toolbar-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .list-toolbar-row:last-child { margin-bottom: 0; }
+
+        .cards-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px; padding: 20px; overflow-y: auto; flex: 1;
+        }
+
+        .company-card {
+            background: white; border-radius: 16px; padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .company-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
+        .company-avatar {
+            width: 50px; height: 50px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 18px; color: white; margin-bottom: 12px;
+        }
+        .company-name { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+        .company-trade { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .company-desc { font-size: 13px; color: #666; margin-bottom: 12px; line-height: 1.4; }
+        .company-meta {
+            display: flex; justify-content: space-between; font-size: 12px; color: #666;
+            padding: 10px 0; border-top: 1px solid #f0f0f0;
+        }
+        .company-address { font-size: 12px; color: #888; margin-bottom: 12px; }
+
+        .btn-map-link {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 6px 12px; background: #f0faf0; border: 1px solid #44a943;
+            border-radius: 6px; font-size: 12px; cursor: pointer; color: #2d6a4f;
+            transition: all 0.2s; margin-top: auto; align-self: flex-start;
+        }
+        .btn-map-link:hover { background: #44a943; color: white; }
+
+        .project-card {
+            background: white; border-radius: 16px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        .project-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
+        .project-image {
+            width: 100%; height: 120px;
+            background: linear-gradient(135deg, #44a943 0%, #2d6a4f 100%);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 40px; position: relative;
+        }
+        .project-year-badge {
+            position: absolute; top: 10px; right: 10px;
+            background: white; color: #333; padding: 4px 10px;
+            border-radius: 12px; font-weight: 600; font-size: 12px;
+        }
+        .project-content { padding: 15px; display: flex; flex-direction: column; flex: 1; }
+        .project-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+        .project-company { font-size: 12px; color: #888; margin-bottom: 6px; }
+        .project-address { font-size: 12px; color: #666; margin-bottom: 8px; }
+        .project-desc { font-size: 13px; color: #666; margin-bottom: 10px; line-height: 1.4; }
+        .project-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
+        .file-warning {
+            background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;
+            padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: #856404; line-height: 1.4;
+        }
+        .file-warning a { color: #533f03; font-weight: 600; }
+
+        .project-image img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+
+        .photo-gallery {
+            display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;
+        }
+        .photo-gallery-main {
+            width: 100%; height: 200px; border-radius: 8px; overflow: hidden;
+            background: #f0f0f0; position: relative;
+        }
+        .photo-gallery-main img {
+            width: 100%; height: 100%; object-fit: cover; cursor: pointer;
+        }
+        .photo-gallery-nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(255,255,255,0.85); border: none; cursor: pointer;
+            font-size: 16px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2); z-index: 10;
+        }
+        .photo-gallery-nav:hover { background: white; }
+        .photo-gallery-nav.prev { left: 8px; }
+        .photo-gallery-nav.next { right: 8px; }
+        .photo-gallery-thumbs {
+            display: flex; gap: 6px; overflow-x: auto;
+        }
+        .photo-gallery-thumb {
+            width: 50px; height: 50px; border-radius: 6px; overflow: hidden;
+            cursor: pointer; border: 2px solid transparent; flex-shrink: 0;
+            transition: border-color 0.2s;
+        }
+        .photo-gallery-thumb.active { border-color: #e37142; }
+        .photo-gallery-thumb img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .photo-counter {
+            position: absolute; bottom: 8px; right: 8px;
+            background: rgba(0,0,0,0.6); color: white; padding: 2px 8px;
+            border-radius: 10px; font-size: 11px;
+        }
+
+        .zones-toggle {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; margin-bottom: 12px;
+            background: #f8faf8; border: 1px solid #e0e0e0; border-radius: 8px;
+            cursor: pointer; user-select: none; transition: all 0.2s;
+        }
+        .zones-toggle:hover { background: #f0f5f0; border-color: #44a943; }
+        .zones-toggle-cb {
+            width: 20px; height: 20px; border: 2px solid #ccc; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: white; transition: all 0.2s; flex-shrink: 0;
+        }
+        .zones-toggle-cb.checked { background: #44a943; border-color: #44a943; }
+        .zones-toggle-label { font-size: 13px; font-weight: 600; color: #333; }
+        .zones-toggle-hint { font-size: 11px; color: #888; }
+
+        .leaflet-container { background: #e8f4e8; }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; max-height: 300px; border-right: none; border-bottom: 1px solid #e0e0e0; }
+            .map-container { flex-direction: column; }
+            .detail-panel { width: 100%; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .tabs { flex-wrap: wrap; margin-left: 0; width: 100%; margin-top: 10px; }
+            .tab-button { flex: 1; font-size: 12px; padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-brand">
+            <div class="navbar-logo">Q</div>
+            <div>
+                <div class="navbar-title">QUERCUS COOPÃRATION</div>
+                <div class="navbar-tagline">L'Art de coopÃ©rer : concevoir, bÃ¢tir, rÃ©nover et amÃ©nager</div>
+            </div>
+        </div>
+        <div class="tabs">
+            <button class="tab-button active" data-tab="tab-trades">Carte MÃ©tiers</button>
+            <button class="tab-button" data-tab="tab-references">Carte RÃ©fÃ©rences</button>
+            <button class="tab-button" data-tab="tab-companies">Liste Entreprises</button>
+            <button class="tab-button" data-tab="tab-projects">Liste RÃ©fÃ©rences</button>
+        </div>
+    </div>
+
+    <!-- Tab 1: Carte MÃ©tiers -->
+    <div id="tab-trades" class="tab-content active">
+        <div class="map-container">
+            <div class="sidebar">
+                <div id="fileWarningTrades"></div>
+                <div class="search-box">
+                    <input type="text" id="tradesSearch" placeholder="Rechercher une entreprise ou un mÃ©tier...">
+                </div>
+                <div class="zones-toggle" id="zonesToggle" onclick="toggleZones()">
+                    <div class="zones-toggle-cb" id="zonesToggleCb">â</div>
+                    <div>
+                        <div class="zones-toggle-label">Zones d'activitÃ©</div>
+                        <div class="zones-toggle-hint">Afficher les zones gÃ©ographiques</div>
+                    </div>
+                </div>
+                <div class="categories" id="tradesCategories"></div>
+                <div class="stats-bar">
+                    <div class="stat-item"><span>Entreprises affichÃ©es</span><span class="stat-value" id="statsCompanies">0</span></div>
+                    <div class="stat-item"><span>SalariÃ©s</span><span class="stat-value" id="statsEmployees">0</span></div>
+                    <div class="stat-item"><span>AssociÃ©s</span><span class="stat-value" id="statsAssociates">0</span></div>
+                </div>
+            </div>
+            <div class="map-wrap">
+                <div id="mapTrades"></div>
+                <div class="detail-panel" id="detailTrades">
+                    <button class="detail-close" onclick="closeDetail('detailTrades')">â</button>
+                    <div id="detailTradesContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: Carte RÃ©fÃ©rences -->
+    <div id="tab-references" class="tab-content">
+        <div class="map-container">
+            <div class="sidebar">
+                <div id="fileWarningRefs"></div>
+                <div class="search-box">
+                    <input type="text" id="referencesSearch" placeholder="Rechercher une rÃ©fÃ©rence...">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">AnnÃ©e</label>
+                    <div class="year-range">
+                        <input type="number" id="yearMin" placeholder="Min" min="2000" max="2030">
+                        <input type="number" id="yearMax" placeholder="Max" min="2000" max="2030">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Domaine entreprise</label>
+                    <select class="filter-select" id="referenceCategoryFilter">
+                        <option value="">Tous les domaines</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">CatÃ©gories de projets</label>
+                    <div class="filter-pills" id="referencePills"></div>
+                </div>
+                <div class="stats-bar">
+                    <div class="stat-item"><span>RÃ©fÃ©rences affichÃ©es</span><span class="stat-value" id="statsProjects">0</span></div>
+                </div>
+            </div>
+            <div class="map-wrap">
+                <div id="mapReferences"></div>
+                <div class="detail-panel" id="detailReferences">
+                    <button class="detail-close" onclick="closeDetail('detailReferences')">â</button>
+                    <div id="detailReferencesContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 3: Liste Entreprises -->
+    <div id="tab-companies" class="tab-content">
+        <div class="list-container">
+            <div class="list-toolbar">
+                <div class="list-toolbar-row">
+                    <input type="text" id="companiesSearch" placeholder="Rechercher une entreprise..." style="flex:2;min-width:200px;padding:10px 15px;border:1px solid #ddd;border-radius:8px;font-family:'Inter';">
+                    <select id="companyCategoryFilter" class="filter-select" style="flex:1;min-width:150px;">
+                        <option value="">Tous les domaines</option>
+                    </select>
+                    <select id="companyTradeFilter" class="filter-select" style="flex:1;min-width:150px;">
+                        <option value="">Tous les mÃ©tiers</option>
+                    </select>
+                </div>
+                <div class="list-toolbar-row">
+                    <button class="btn btn-primary" id="exportCompaniesBtn" style="flex:1;">Exporter CSV</button>
+                    <button class="btn btn-secondary" id="importCompaniesBtn" style="flex:1;">Importer CSV</button>
+                    <input type="file" id="fileInputCompanies" accept=".csv" style="display:none;">
+                </div>
+            </div>
+            <div class="cards-grid" id="companiesList"></div>
+        </div>
+    </div>
+
+    <!-- Tab 4: Liste RÃ©fÃ©rences -->
+    <div id="tab-projects" class="tab-content">
+        <div class="list-container">
+            <div class="list-toolbar">
+                <div class="list-toolbar-row">
+                    <input type="text" id="projectsSearch" placeholder="Rechercher un projet..." style="flex:2;min-width:200px;padding:10px 15px;border:1px solid #ddd;border-radius:8px;font-family:'Inter';">
+                    <select id="projectReferenceFilter" class="filter-select" style="flex:1;min-width:150px;">
+                        <option value="">Toutes les catÃ©gories</option>
+                    </select>
+                    <select id="projectCategoryFilter" class="filter-select" style="flex:1;min-width:150px;">
+                        <option value="">Tous les domaines</option>
+                    </select>
+                    <select id="projectYearFilter" class="filter-select" style="flex:1;min-width:120px;">
+                        <option value="">Toutes les annÃ©es</option>
+                    </select>
+                </div>
+                <div class="list-toolbar-row">
+                    <button class="btn btn-primary" id="exportProjectsBtn" style="flex:1;">Exporter CSV</button>
+                    <button class="btn btn-secondary" id="importProjectsBtn" style="flex:1;">Importer CSV</button>
+                </div>
+            </div>
+            <div class="cards-grid" id="projectsList"></div>
+        </div>
+    </div>
+
+<script>
+// ===================== CONFIGURATION GOOGLE SHEETS =====================
+// INSTRUCTIONS : Remplacez les ID ci-dessous par ceux de votre Google Sheets publiÃ©.
+// 1. CrÃ©ez un Google Sheets avec 2 onglets : "Entreprises" et "RÃ©fÃ©rences"
+// 2. Fichier > Partager > Publier sur le Web > Format CSV > Publier
+// 3. Copiez l'ID du document (la partie entre /d/ et /edit dans l'URL)
+// 4. Collez-le ci-dessous. Laissez vide pour utiliser les donnÃ©es locales.
+const GOOGLE_SHEETS_ID = '1R-lihe9oEjx5uEYpqtl-48t1Z6wmrLSyg_LFCPsY454';
+const SHEET_ENTREPRISES = 'Entreprises'; // Nom de l'onglet entreprises
+const SHEET_REFERENCES = 'RÃ©fÃ©rences';   // Nom de l'onglet rÃ©fÃ©rences
+// ===================== FIN CONFIGURATION =====================
+
+// ===================== ZONES GÃOGRAPHIQUES PRÃDÃFINIES =====================
+const PREDEFINED_ZONES = {
+    'AURA': { lat: 45.75, lng: 4.85, radius: 95000, label: 'Auvergne-RhÃ´ne-Alpes' },
+    'Quart Sud-Est': { lat: 44.85, lng: 5.40, radius: 180000, label: 'Quart Sud-Est' },
+    'Paris-IDF': { lat: 48.8566, lng: 2.3522, radius: 40000, label: 'Paris / Ãle-de-France' },
+    'Nord': { lat: 50.15, lng: 3.00, radius: 120000, label: 'Nord de la France' },
+    'PyrÃ©nÃ©es': { lat: 42.95, lng: 0.80, radius: 130000, label: 'PyrÃ©nÃ©es' },
+    'Grand Est': { lat: 48.60, lng: 6.20, radius: 130000, label: 'Grand Est' },
+    'Bretagne': { lat: 48.20, lng: -2.80, radius: 120000, label: 'Bretagne' },
+    'PACA': { lat: 43.70, lng: 5.80, radius: 110000, label: 'Provence-Alpes-CÃ´te d\'Azur' },
+    'Occitanie': { lat: 43.60, lng: 2.30, radius: 150000, label: 'Occitanie' },
+    'Nouvelle-Aquitaine': { lat: 45.20, lng: 0.00, radius: 160000, label: 'Nouvelle-Aquitaine' },
+    'Normandie': { lat: 49.10, lng: 0.30, radius: 100000, label: 'Normandie' },
+    'Bourgogne-FC': { lat: 47.10, lng: 5.50, radius: 120000, label: 'Bourgogne-Franche-ComtÃ©' },
+    'Centre-VdL': { lat: 47.60, lng: 1.70, radius: 120000, label: 'Centre-Val de Loire' },
+    'Pays de la Loire': { lat: 47.50, lng: -0.90, radius: 110000, label: 'Pays de la Loire' },
+    'France entiÃ¨re': { lat: 46.60, lng: 2.50, radius: 450000, label: 'France entiÃ¨re' }
+};
+
+// Fonction pour parser les zones d'une entreprise
+// Format: "AURA;Paris-IDF;custom:48.856,2.352,50,Mon Label"
+function parseCompanyZones(zonesStr) {
+    if (!zonesStr || !zonesStr.trim()) return [];
+    return zonesStr.split(';').map(z => z.trim()).filter(z => z).map(zone => {
+        if (zone.startsWith('custom:')) {
+            const parts = zone.substring(7).split(',');
+            if (parts.length >= 3) {
+                return {
+                    type: 'custom',
+                    lat: parseFloat(parts[0]),
+                    lng: parseFloat(parts[1]),
+                    radius: parseFloat(parts[2]) * 1000, // km â m
+                    label: parts.length >= 4 ? parts.slice(3).join(',') : 'Zone personnalisÃ©e'
+                };
+            }
+            return null;
+        } else if (PREDEFINED_ZONES[zone]) {
+            return { type: 'predefined', key: zone, ...PREDEFINED_ZONES[zone] };
+        }
+        return null;
+    }).filter(z => z !== null);
+}
+
+// ===================== DATA =====================
+const tradeCategories = {
+    'Ãtudes & MaÃ®trise d\'Åuvre': {
+        color: '#1a73a7',
+        trades: ['Architecte','Bureau d\'Ã©tudes structure','Bureau d\'Ã©tudes thermique','Bureau d\'Ã©tudes acoustique',
+            'Bureau d\'Ã©tudes fluides / CVC','Bureau d\'Ã©tudes VRD','Ãconomiste de la construction',
+            'GÃ©omÃ¨tre-expert','GÃ©otechnicien','OPC (Pilotage chantier)','ContrÃ´leur technique',
+            'Coordinateur SPS','Diagnostiqueur','Paysagiste concepteur']
+    },
+    'Gros Åuvre': {
+        color: '#e37142',
+        trades: ['MaÃ§onnerie / Gros Åuvre','Terrassement / TP','Charpente bois','Charpente mÃ©tallique',
+            'Ossature bois','BÃ©ton armÃ© / BÃ©ton bas carbone','Fondations spÃ©ciales']
+    },
+    'Second Åuvre': {
+        color: '#44a943',
+        trades: ['PlÃ¢trerie / Plaquiste','Peinture','Menuiseries extÃ©rieures','Menuiseries intÃ©rieures',
+            'Carrelage / RevÃªtements sols','ÃlectricitÃ©','Plomberie / Sanitaires',
+            'Chauffage / CVC / Climatisation','Isolation thermique','Couverture / ÃtanchÃ©itÃ©',
+            'Serrurerie / MÃ©tallerie','Vitrerie / Miroiterie','Ascensoriste']
+    },
+    'AmÃ©nagement & SpÃ©cialitÃ©s': {
+        color: '#e8a832',
+        trades: ['Paysagiste / Espaces verts','VRD / Voirie / RÃ©seaux','DÃ©samiantage / DÃ©pollution',
+            'DÃ©molition / Curage','SignalÃ©tique','PhotovoltaÃ¯que / EnR']
+    }
+};
+
+const referenceCategories = [
+    'Construction Neuve','RÃ©novation Ã©nergÃ©tique','Extension / SurÃ©lÃ©vation','RÃ©habilitation lourde',
+    'AmÃ©nagement intÃ©rieur','AmÃ©nagement extÃ©rieur / Paysager','Ãquipements techniques',
+    'PhotovoltaÃ¯que / EnR','Construction bois / Ossature bois','BÃ©ton bas carbone',
+    'Isolation biosourcÃ©e','Logement collectif','Logement individuel','ERP / BÃ¢timent public',
+    'Tertiaire / Bureaux','Industriel / Commercial','Patrimoine / Monument historique'
+];
+
+const DEFAULT_COMPANIES = [
+    {id:1,name:'ArchiDesign Lyon',category:'Ãtudes & MaÃ®trise d\'Åuvre',trade:'Architecte',description:'Cabinet d\'architecture spÃ©cialisÃ© dans la rÃ©novation durable',employees:12,associates:3,ca:'850kâ¬',address:'45, Rue de SÃ¨ze, 69000 Lyon',lat:45.7640,lng:4.8357,phone:'04 72 XX XX XX',zones:'AURA',rayon:50},
+    {id:2,name:'BET Structure Grenoble',category:'Ãtudes & MaÃ®trise d\'Åuvre',trade:'Bureau d\'Ã©tudes structure',description:'Bureau d\'Ã©tudes spÃ©cialisÃ© en structures bÃ©ton et acier',employees:8,associates:2,ca:'450kâ¬',address:'12, Rue de la RÃ©publique, 38000 Grenoble',lat:45.1885,lng:5.7245,phone:'04 76 XX XX XX',zones:'AURA',rayon:40},
+    {id:3,name:'MaÃ§onnerie AURA',category:'Gros Åuvre',trade:'MaÃ§onnerie / Gros Åuvre',description:'Entreprise gÃ©nÃ©raliste en maÃ§onnerie et gros Åuvre',employees:25,associates:5,ca:'1.2Mâ¬',address:'8, Avenue de ChambÃ©ry, 73000 ChambÃ©ry',lat:45.5627,lng:5.9128,phone:'04 79 XX XX XX',zones:'AURA',rayon:30},
+    {id:4,name:'Charpente Bois Alpes',category:'Gros Åuvre',trade:'Charpente bois',description:'SpÃ©cialiste de la charpente et construction bois',employees:15,associates:3,ca:'680kâ¬',address:'25, Rue de la Montagne, 74000 Annecy',lat:45.8992,lng:6.1294,phone:'04 50 XX XX XX',zones:'AURA;PACA',rayon:80},
+    {id:5,name:'Ossature Bois RhÃ´ne',category:'Gros Åuvre',trade:'Ossature bois',description:'Ossature bois pour maisons individuelles et collectifs',employees:18,associates:4,ca:'920kâ¬',address:'42, Rue du Bourg, 42100 Saint-Ãtienne',lat:45.4396,lng:4.3883,phone:'04 77 XX XX XX',zones:'Quart Sud-Est;PyrÃ©nÃ©es;Paris-IDF;Nord',rayon:100},
+    {id:6,name:'ÃlectricitÃ© Pro',category:'Second Åuvre',trade:'ÃlectricitÃ©',description:'Installation Ã©lectrique rÃ©sidentielle et tertiaire',employees:12,associates:2,ca:'580kâ¬',address:'78, Avenue Daumesnil, 69000 Lyon',lat:45.7520,lng:4.8455,phone:'04 72 XX XX XX',zones:'AURA',rayon:30},
+    {id:7,name:'Plomberie & Sanitaires Clermont',category:'Second Åuvre',trade:'Plomberie / Sanitaires',description:'Plomberie sanitaire chauffage',employees:10,associates:2,ca:'420kâ¬',address:'33, Rue Montlosier, 63000 Clermont-Ferrand',lat:45.2679,lng:3.1902,phone:'04 73 XX XX XX',zones:'AURA',rayon:35},
+    {id:8,name:'Menuiseries Prestige',category:'Second Åuvre',trade:'Menuiseries extÃ©rieures',description:'FenÃªtres portes menuiseries haut de gamme',employees:14,associates:3,ca:'720kâ¬',address:'12, Route NapolÃ©on, 38700 Corenc',lat:45.2378,lng:5.7803,phone:'04 76 XX XX XX',zones:'AURA;PACA',rayon:60},
+    {id:9,name:'Paysagiste VallÃ©e',category:'AmÃ©nagement & SpÃ©cialitÃ©s',trade:'Paysagiste / Espaces verts',description:'AmÃ©nagement paysager et entretien d\'espaces verts',employees:8,associates:2,ca:'350kâ¬',address:'5, Chemin des Champs, 26000 Valence',lat:44.9325,lng:4.8937,phone:'04 75 XX XX XX',zones:'AURA',rayon:25},
+    {id:10,name:'VRD Solutions',category:'AmÃ©nagement & SpÃ©cialitÃ©s',trade:'VRD / Voirie / RÃ©seaux',description:'Voirie rÃ©seaux divers et terrassement',employees:20,associates:4,ca:'950kâ¬',address:'50, Boulevard Vivier Merle, 69003 Lyon',lat:45.7578,lng:4.8483,phone:'04 72 XX XX XX',zones:'AURA;Occitanie',rayon:70},
+    {id:11,name:'Plaquiste QualitÃ©',category:'Second Åuvre',trade:'PlÃ¢trerie / Plaquiste',description:'PlÃ¢trerie plaquiste cloisons isolation',employees:9,associates:2,ca:'380kâ¬',address:'100, Rue Victor Hugo, 69600 Oullins',lat:45.7306,lng:4.8116,phone:'04 72 XX XX XX',zones:'AURA',rayon:20}
+];
+
+const DEFAULT_PROJECTS = [
+    {id:1,title:'Immeuble collectif rÃ©sidentiel',category:'Logement collectif',company_id:1,company:'ArchiDesign Lyon',address:'123, Bd de la Croix-Rousse, 69000 Lyon',lat:45.7708,lng:4.8208,year:2022,description:'RÃ©habilitation complÃ¨te d\'un immeuble Haussmannien',image:'ð¢',photos:[],references:['RÃ©novation Ã©nergÃ©tique','Patrimoine / Monument historique']},
+    {id:2,title:'Maison individuelle ossature bois',category:'Logement individuel',company_id:4,company:'Charpente Bois Alpes',address:'456, Route de Marnaz, 74200 Thonon',lat:46.3718,lng:6.4719,year:2023,description:'Construction neuve en ossature bois avec critÃ¨res environnementaux',image:'ð¡',photos:[],references:['Construction Neuve','Construction bois / Ossature bois']},
+    {id:3,title:'Bureau tertiaire haute performance',category:'Tertiaire / Bureaux',company_id:2,company:'BET Structure Grenoble',address:'789, Rue FÃ©lix Poulat, 38000 Grenoble',lat:45.1963,lng:5.7245,year:2021,description:'Bureaux avec performance Ã©nergÃ©tique et confort thermique optimal',image:'ð¢',photos:[],references:['Construction Neuve','Ãquipements techniques']},
+    {id:4,title:'RÃ©novation villa avec extension',category:'Logement individuel',company_id:3,company:'MaÃ§onnerie AURA',address:'234, Av. de la Paix, 73160 St-Jean-de-Maurienne',lat:45.2856,lng:6.3586,year:2023,description:'Extension et rÃ©novation Ã©nergÃ©tique d\'une villa annÃ©es 90',image:'ð¡',photos:[],references:['Extension / SurÃ©lÃ©vation','RÃ©novation Ã©nergÃ©tique']},
+    {id:5,title:'Installation photovoltaÃ¯que',category:'PhotovoltaÃ¯que / EnR',company_id:9,company:'Paysagiste VallÃ©e',address:'567, Rue de la LibertÃ©, 26000 Valence',lat:44.9342,lng:4.8956,year:2022,description:'Panneaux photovoltaÃ¯ques sur toiture industrielle',image:'â¡',photos:[],references:['PhotovoltaÃ¯que / EnR']},
+    {id:6,title:'RÃ©habilitation Ã©cole publique',category:'ERP / BÃ¢timent public',company_id:5,company:'Ossature Bois RhÃ´ne',address:'890, Rue de l\'Ãcole, 42100 Saint-Ãtienne',lat:45.4401,lng:4.3895,year:2020,description:'RÃ©habilitation lourde avec amÃ©lioration sismique et Ã©nergÃ©tique',image:'ð«',photos:[],references:['RÃ©habilitation lourde','ERP / BÃ¢timent public']},
+    {id:7,title:'Bloc rÃ©sidentiel 50 logements',category:'Logement collectif',company_id:6,company:'ÃlectricitÃ© Pro',address:'111, Bd Jean JaurÃ¨s, 69000 Lyon',lat:45.7598,lng:4.8390,year:2023,description:'Construction neuve d\'un collectif rÃ©sidentiel 50 logements',image:'ð¢',photos:[],references:['Construction Neuve','Logement collectif']},
+    {id:8,title:'AmÃ©nagement parc urbain',category:'AmÃ©nagement extÃ©rieur / Paysager',company_id:10,company:'VRD Solutions',address:'222, Parc de la TÃªte d\'Or, 69000 Lyon',lat:45.7729,lng:4.8584,year:2021,description:'AmÃ©nagement complet d\'un parc urbain avec VRD',image:'ð³',photos:[],references:['AmÃ©nagement extÃ©rieur / Paysager']},
+    {id:9,title:'Restaurant avec cuisine ouverte',category:'Industriel / Commercial',company_id:8,company:'Menuiseries Prestige',address:'333, Rue Pasteur, 38000 Grenoble',lat:45.1887,lng:5.7231,year:2022,description:'RÃ©novation intÃ©rieure complÃ¨te avec amÃ©nagement commercial',image:'ðª',photos:[],references:['AmÃ©nagement intÃ©rieur','Industriel / Commercial']},
+    {id:10,title:'Immeuble ancien restructurÃ©',category:'Patrimoine / Monument historique',company_id:7,company:'Plomberie & Sanitaires Clermont',address:'444, Rue du P. de Foucauld, 63000 Clermont-Ferrand',lat:45.2677,lng:3.1879,year:2021,description:'Restructuration bÃ¢timent ancien, mise aux normes accessibilitÃ©',image:'ðï¸',photos:[],references:['Patrimoine / Monument historique','RÃ©habilitation lourde']}
+];
+
+// ===================== DONNÃES DYNAMIQUES =====================
+let companies = [...DEFAULT_COMPANIES];
+let projects = [...DEFAULT_PROJECTS];
+let dataSource = 'local'; // 'local' ou 'google-sheets'
+
+// ===================== GOOGLE SHEETS LOADER =====================
+function getSheetCSVUrl(sheetId, sheetName) {
+    return 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName);
+}
+
+function parseCSVToArray(csvText) {
+    const lines = csvText.split('\n');
+    if (lines.length < 2) return [];
+    const headers = parseCSVLine(lines[0]).map(h => h.trim().replace(/^\uFEFF/, ''));
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const values = parseCSVLine(lines[i]);
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = (values[idx] || '').trim(); });
+        rows.push(obj);
+    }
+    return rows;
+}
+
+function mapSheetToCompanies(rows) {
+    return rows.map((row, idx) => ({
+        id: parseInt(row['ID']) || (idx + 1),
+        name: row['Nom'] || '',
+        category: row['Domaine'] || '',
+        trade: row['MÃ©tier'] || '',
+        description: row['Description'] || '',
+        employees: parseInt(row['SalariÃ©s']) || 0,
+        associates: parseInt(row['AssociÃ©s']) || 0,
+        ca: row['CA'] || '',
+        address: row['Adresse'] || '',
+        phone: row['TÃ©lÃ©phone'] || '',
+        lat: parseFloat(row['Latitude']) || 45.75,
+        lng: parseFloat(row['Longitude']) || 4.85,
+        zones: row['Zones'] || '',
+        rayon: parseInt(row['Rayon']) || 0
+    })).filter(c => c.name);
+}
+
+function mapSheetToProjects(rows) {
+    return rows.map((row, idx) => ({
+        id: parseInt(row['ID']) || (idx + 1),
+        title: row['Titre'] || '',
+        category: row['CatÃ©gorie'] || '',
+        company_id: parseInt(row['ID Entreprise']) || 0,
+        company: row['Entreprise'] || '',
+        address: row['Adresse'] || '',
+        lat: parseFloat(row['Latitude']) || 45.75,
+        lng: parseFloat(row['Longitude']) || 4.85,
+        year: parseInt(row['AnnÃ©e']) || 2023,
+        description: row['Description'] || '',
+        image: row['Image'] || 'ðï¸',
+        photos: [row['Photo1'],row['Photo2'],row['Photo3'],row['Photo4'],row['Photo5']].map(u => (u||'').trim()).filter(u => u),
+        references: (row['RÃ©fÃ©rences'] || '').split(';').map(r => r.trim()).filter(r => r)
+    })).filter(p => p.title);
+}
+
+async function loadFromGoogleSheets() {
+    if (!GOOGLE_SHEETS_ID) {
+        console.log('[QUERCUS] Pas d\'ID Google Sheets configurÃ© â donnÃ©es locales utilisÃ©es');
+        return false;
+    }
+    try {
+        console.log('[QUERCUS] Chargement depuis Google Sheets...');
+        const [compResp, projResp] = await Promise.all([
+            fetch(getSheetCSVUrl(GOOGLE_SHEETS_ID, SHEET_ENTREPRISES)),
+            fetch(getSheetCSVUrl(GOOGLE_SHEETS_ID, SHEET_REFERENCES))
+        ]);
+        if (!compResp.ok || !projResp.ok) throw new Error('Erreur HTTP');
+        const compCSV = await compResp.text();
+        const projCSV = await projResp.text();
+        const newCompanies = mapSheetToCompanies(parseCSVToArray(compCSV));
+        const newProjects = mapSheetToProjects(parseCSVToArray(projCSV));
+        if (newCompanies.length === 0 && newProjects.length === 0) {
+            console.warn('[QUERCUS] Google Sheets vide â donnÃ©es locales conservÃ©es');
+            return false;
+        }
+        if (newCompanies.length > 0) companies = newCompanies;
+        if (newProjects.length > 0) projects = newProjects;
+        dataSource = 'google-sheets';
+        console.log('[QUERCUS] â DonnÃ©es chargÃ©es depuis Google Sheets (' + companies.length + ' entreprises, ' + projects.length + ' rÃ©fÃ©rences)');
+        return true;
+    } catch (err) {
+        console.warn('[QUERCUS] â ï¸ Impossible de charger Google Sheets â fallback donnÃ©es locales. Erreur:', err.message);
+        return false;
+    }
+}
+
+// ===================== STATE =====================
+let maps = {};
+let markers = {};
+let zoneCircles = []; // Cercles Leaflet des zones d'activitÃ©
+let showZones = false; // Ãtat du toggle zones
+let selectedFilters = { trades: new Set(), references: new Set() };
+
+// ===================== INIT =====================
+async function init() {
+    if (window.location.protocol === 'file:') {
+        const msg = '<div class="file-warning">â ï¸ Fichier ouvert en local (file://). Les cartes peuvent ne pas s\'afficher. <b>Solution :</b> double-cliquez sur <b>LANCER_APP.bat</b> dans le mÃªme dossier.</div>';
+        const w1 = document.getElementById('fileWarningTrades');
+        const w2 = document.getElementById('fileWarningRefs');
+        if (w1) w1.innerHTML = msg;
+        if (w2) w2.innerHTML = msg;
+    }
+    // Tenter le chargement Google Sheets (fallback automatique si Ã©chec)
+    await loadFromGoogleSheets();
+    initTabs();
+    initTradesMap();
+    initReferencesMap();
+    populateAllFilters();
+    filterAndRenderCompanies();
+    filterAndRenderProjects();
+    updateStats();
+    // Afficher la source de donnÃ©es
+    if (dataSource === 'google-sheets') {
+        console.log('[QUERCUS] ð¢ Mode Google Sheets actif');
+    } else {
+        console.log('[QUERCUS] ðµ Mode donnÃ©es locales actif');
+    }
+}
+
+function switchToTab(tabId) {
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    const btn = document.querySelector('.tab-button[data-tab="' + tabId + '"]');
+    if (btn) btn.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+    setTimeout(() => {
+        if (maps.trades) maps.trades.invalidateSize();
+        if (maps.references) maps.references.invalidateSize();
+    }, 200);
+}
+
+function initTabs() {
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.addEventListener('click', () => switchToTab(btn.getAttribute('data-tab')));
+    });
+}
+
+function closeDetail(panelId) {
+    document.getElementById(panelId).classList.remove('open');
+}
+
+// ===================== MAPS =====================
+function createTileLayer() {
+    return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains: ['a', 'b', 'c'],
+        maxZoom: 19,
+        crossOrigin: true
+    });
+}
+
+function initTradesMap() {
+    maps.trades = L.map('mapTrades', {zoomControl: true, scrollWheelZoom: true}).setView([45.75, 4.85], 8);
+    createTileLayer().addTo(maps.trades);
+    setTimeout(() => maps.trades.invalidateSize(), 300);
+    renderTradesMap();
+    document.getElementById('tradesSearch').addEventListener('input', filterAndRenderTrades);
+}
+
+// ===================== ZONES D'ACTIVITÃ =====================
+function toggleZones() {
+    showZones = !showZones;
+    const cb = document.getElementById('zonesToggleCb');
+    if (showZones) {
+        cb.classList.add('checked');
+        renderZones();
+    } else {
+        cb.classList.remove('checked');
+        clearZones();
+    }
+}
+
+function clearZones() {
+    zoneCircles.forEach(c => maps.trades.removeLayer(c));
+    zoneCircles = [];
+}
+
+function renderZones(filteredCompanies) {
+    clearZones();
+    if (!showZones || !maps.trades) return;
+    const comps = filteredCompanies || getFilteredCompanies();
+    comps.forEach(company => {
+        const color = tradeCategories[company.category] ? tradeCategories[company.category].color : '#999';
+
+        // Cercle rayon local (pÃ©rimÃ¨tre d'activitÃ© autour du siÃ¨ge)
+        if (company.rayon && company.rayon > 0) {
+            const localCircle = L.circle([company.lat, company.lng], {
+                radius: company.rayon * 1000, // km â m
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.10,
+                weight: 2,
+                dashArray: '4,4'
+            }).addTo(maps.trades);
+            localCircle.bindTooltip(company.name + ' â Rayon ' + company.rayon + ' km', { sticky: true });
+            zoneCircles.push(localCircle);
+        }
+
+        // Zones gÃ©ographiques prÃ©dÃ©finies + custom
+        const zones = parseCompanyZones(company.zones);
+        zones.forEach(zone => {
+            const circle = L.circle([zone.lat, zone.lng], {
+                radius: zone.radius,
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.04,
+                weight: 1,
+                dashArray: '8,6'
+            }).addTo(maps.trades);
+            circle.bindTooltip(company.name + ' â ' + zone.label, { sticky: true });
+            zoneCircles.push(circle);
+        });
+    });
+}
+
+function initReferencesMap() {
+    maps.references = L.map('mapReferences', {zoomControl: true, scrollWheelZoom: true}).setView([45.75, 4.85], 8);
+    createTileLayer().addTo(maps.references);
+    setTimeout(() => maps.references.invalidateSize(), 300);
+    renderReferencesMap();
+    document.getElementById('referencesSearch').addEventListener('input', filterAndRenderReferences);
+    document.getElementById('yearMin').addEventListener('input', filterAndRenderReferences);
+    document.getElementById('yearMax').addEventListener('input', filterAndRenderReferences);
+    document.getElementById('referenceCategoryFilter').addEventListener('change', filterAndRenderReferences);
+}
+
+// ===================== TRADES SIDEBAR =====================
+function populateTradesCategories() {
+    const container = document.getElementById('tradesCategories');
+    container.innerHTML = '';
+    Object.entries(tradeCategories).forEach(([category, data]) => {
+        const catDiv = document.createElement('div');
+        catDiv.className = 'category-group';
+
+        const header = document.createElement('div');
+        header.className = 'category-header';
+
+        const toggle = document.createElement('div');
+        toggle.className = 'category-toggle';
+        toggle.innerHTML = 'â';
+
+        const colorDot = document.createElement('div');
+        colorDot.className = 'category-color';
+        colorDot.style.backgroundColor = data.color;
+
+        const label = document.createElement('div');
+        label.className = 'category-label';
+        label.textContent = category;
+
+        const arrow = document.createElement('div');
+        arrow.style.cssText = 'font-size:14px;color:#44a943;transition:transform 0.2s;transform:rotate(-90deg)';
+        arrow.textContent = 'â¼';
+
+        header.appendChild(toggle);
+        header.appendChild(colorDot);
+        header.appendChild(label);
+        header.appendChild(arrow);
+
+        const tradesDiv = document.createElement('div');
+        tradesDiv.className = 'trades';
+
+        data.trades.forEach(trade => {
+            const item = document.createElement('div');
+            item.className = 'trade-item';
+            const cb = document.createElement('div');
+            cb.className = 'trade-checkbox';
+            cb.innerHTML = 'â';
+            const lbl = document.createElement('span');
+            lbl.textContent = trade;
+            item.appendChild(cb);
+            item.appendChild(lbl);
+            item.addEventListener('click', () => {
+                cb.classList.toggle('checked');
+                if (cb.classList.contains('checked')) selectedFilters.trades.add(trade);
+                else selectedFilters.trades.delete(trade);
+                filterAndRenderTrades();
+            });
+            tradesDiv.appendChild(item);
+        });
+
+        header.addEventListener('click', (e) => {
+            if (e.target === toggle || toggle.contains(e.target)) {
+                e.stopPropagation();
+                toggle.classList.toggle('checked');
+                tradesDiv.querySelectorAll('.trade-checkbox').forEach(cb => {
+                    if (toggle.classList.contains('checked')) {
+                        cb.classList.add('checked');
+                        selectedFilters.trades.add(cb.nextSibling.textContent);
+                    } else {
+                        cb.classList.remove('checked');
+                        selectedFilters.trades.delete(cb.nextSibling.textContent);
+                    }
+                });
+                filterAndRenderTrades();
+            } else {
+                tradesDiv.classList.toggle('open');
+                arrow.style.transform = tradesDiv.classList.contains('open') ? 'rotate(0deg)' : 'rotate(-90deg)';
+            }
+        });
+
+        catDiv.appendChild(header);
+        catDiv.appendChild(tradesDiv);
+        container.appendChild(catDiv);
+    });
+}
+
+// ===================== FILTERS =====================
+function populateReferencesFilters() {
+    const pills = document.getElementById('referencePills');
+    pills.innerHTML = '';
+    referenceCategories.forEach(cat => {
+        const pill = document.createElement('button');
+        pill.className = 'pill';
+        pill.textContent = cat;
+        pill.addEventListener('click', () => {
+            pill.classList.toggle('active');
+            if (pill.classList.contains('active')) selectedFilters.references.add(cat);
+            else selectedFilters.references.delete(cat);
+            filterAndRenderReferences();
+        });
+        pills.appendChild(pill);
+    });
+
+    const catSelect = document.getElementById('referenceCategoryFilter');
+    Object.keys(tradeCategories).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat; opt.textContent = cat;
+        catSelect.appendChild(opt);
+    });
+}
+
+function populateAllFilters() {
+    populateTradesCategories();
+    populateReferencesFilters();
+
+    // Company filters
+    const companyCatSel = document.getElementById('companyCategoryFilter');
+    Object.keys(tradeCategories).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat; opt.textContent = cat;
+        companyCatSel.appendChild(opt);
+    });
+    companyCatSel.addEventListener('change', (e) => {
+        const tradeSel = document.getElementById('companyTradeFilter');
+        tradeSel.innerHTML = '<option value="">Tous les mÃ©tiers</option>';
+        if (e.target.value && tradeCategories[e.target.value]) {
+            tradeCategories[e.target.value].trades.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t; opt.textContent = t;
+                tradeSel.appendChild(opt);
+            });
+        }
+        filterAndRenderCompanies();
+    });
+    document.getElementById('companyTradeFilter').addEventListener('change', filterAndRenderCompanies);
+    document.getElementById('companiesSearch').addEventListener('input', filterAndRenderCompanies);
+    document.getElementById('exportCompaniesBtn').addEventListener('click', exportCompanies);
+    document.getElementById('importCompaniesBtn').addEventListener('click', () => document.getElementById('fileInputCompanies').click());
+    document.getElementById('fileInputCompanies').addEventListener('change', (e) => importCompanies(e.target.files[0]));
+
+    // Project filters
+    const projRefSel = document.getElementById('projectReferenceFilter');
+    referenceCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat; opt.textContent = cat;
+        projRefSel.appendChild(opt);
+    });
+    const projCatSel = document.getElementById('projectCategoryFilter');
+    Object.keys(tradeCategories).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat; opt.textContent = cat;
+        projCatSel.appendChild(opt);
+    });
+    const projYearSel = document.getElementById('projectYearFilter');
+    const years = [...new Set(projects.map(p => p.year))].sort((a,b) => b-a);
+    years.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y; opt.textContent = y;
+        projYearSel.appendChild(opt);
+    });
+    document.getElementById('projectsSearch').addEventListener('input', filterAndRenderProjects);
+    projRefSel.addEventListener('change', filterAndRenderProjects);
+    projCatSel.addEventListener('change', filterAndRenderProjects);
+    projYearSel.addEventListener('change', filterAndRenderProjects);
+    document.getElementById('exportProjectsBtn').addEventListener('click', exportProjects);
+    document.getElementById('importProjectsBtn').addEventListener('click', () => {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = '.csv';
+        inp.addEventListener('change', e => importProjects(e.target.files[0]));
+        inp.click();
+    });
+}
+
+// ===================== FILTER + RENDER =====================
+function getFilteredCompanies() {
+    const search = document.getElementById('tradesSearch').value.toLowerCase();
+    return companies.filter(c => {
+        const matchSearch = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
+        const matchTrade = selectedFilters.trades.size === 0 || selectedFilters.trades.has(c.trade);
+        return matchSearch && matchTrade;
+    });
+}
+
+function filterAndRenderTrades() {
+    const filtered = getFilteredCompanies();
+    renderTradesMap(filtered);
+    renderZones(filtered);
+    updateStats(filtered);
+}
+
+function renderTradesMap(filtered) {
+    if (!filtered) filtered = companies;
+    if (markers.trades) markers.trades.forEach(m => maps.trades.removeLayer(m));
+    markers.trades = [];
+    filtered.forEach(company => {
+        const color = tradeCategories[company.category] ? tradeCategories[company.category].color : '#999';
+        const marker = L.circleMarker([company.lat, company.lng], {
+            radius: 12, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+        }).addTo(maps.trades);
+        marker.companyData = company;
+        marker.on('click', () => showCompanyDetail(company, 'detailTrades'));
+        marker.bindTooltip(company.name, {direction: 'top', offset: [0, -10]});
+        markers.trades.push(marker);
+    });
+}
+
+function getFilteredProjects() {
+    const search = document.getElementById('referencesSearch').value.toLowerCase();
+    const yearMin = parseInt(document.getElementById('yearMin').value) || 0;
+    const yearMax = parseInt(document.getElementById('yearMax').value) || 9999;
+    const catFilter = document.getElementById('referenceCategoryFilter').value;
+    return projects.filter(p => {
+        const matchSearch = !search || p.title.toLowerCase().includes(search) || p.company.toLowerCase().includes(search) || p.address.toLowerCase().includes(search);
+        const matchYear = p.year >= yearMin && p.year <= yearMax;
+        const matchCat = !catFilter || (function() {
+            const comp = companies.find(c => c.id === p.company_id);
+            return comp && comp.category === catFilter;
+        })();
+        const matchRef = selectedFilters.references.size === 0 || p.references.some(r => selectedFilters.references.has(r));
+        return matchSearch && matchYear && matchCat && matchRef;
+    });
+}
+
+function filterAndRenderReferences() {
+    const filtered = getFilteredProjects();
+    renderReferencesMap(filtered);
+    document.getElementById('statsProjects').textContent = filtered.length;
+}
+
+function renderReferencesMap(filtered) {
+    if (!filtered) filtered = projects;
+    if (markers.references) markers.references.forEach(m => maps.references.removeLayer(m));
+    markers.references = [];
+    filtered.forEach(project => {
+        const marker = L.circleMarker([project.lat, project.lng], {
+            radius: 14, fillColor: '#e37142', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.85
+        }).addTo(maps.references);
+        marker.projectData = project;
+        marker.on('click', () => showProjectDetail(project, 'detailReferences'));
+        marker.bindTooltip(project.title, {direction: 'top', offset: [0, -10]});
+        markers.references.push(marker);
+    });
+}
+
+// ===================== LIST VIEWS =====================
+function filterAndRenderCompanies() {
+    const search = (document.getElementById('companiesSearch').value || '').toLowerCase();
+    const cat = document.getElementById('companyCategoryFilter').value;
+    const trade = document.getElementById('companyTradeFilter').value;
+    const filtered = companies.filter(c => {
+        const ms = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
+        const mc = !cat || c.category === cat;
+        const mt = !trade || c.trade === trade;
+        return ms && mc && mt;
+    });
+    const list = document.getElementById('companiesList');
+    list.innerHTML = '';
+    filtered.forEach(company => {
+        const color = tradeCategories[company.category] ? tradeCategories[company.category].color : '#999';
+        const card = document.createElement('div');
+        card.className = 'company-card';
+        card.innerHTML =
+            '<div class="company-avatar" style="background:' + color + ';">' + company.name.charAt(0) + '</div>' +
+            '<div class="company-name">' + company.name + '</div>' +
+            '<div class="company-trade">' + company.trade + ' â ' + company.category + '</div>' +
+            '<div class="company-desc">' + company.description + '</div>' +
+            '<div class="company-meta"><span>ð¥ ' + company.employees + ' sal.</span><span>ð¤ ' + company.associates + ' assoc.</span><span>ð° ' + company.ca + '</span></div>' +
+            '<div class="company-address">ð ' + company.address + '</div>' +
+            '<button class="btn-map-link" onclick="goToCompanyOnMap(' + company.id + ')">ð Voir sur la carte</button>';
+        list.appendChild(card);
+    });
+}
+
+function filterAndRenderProjects() {
+    const search = (document.getElementById('projectsSearch').value || '').toLowerCase();
+    const ref = document.getElementById('projectReferenceFilter').value;
+    const cat = document.getElementById('projectCategoryFilter').value;
+    const year = document.getElementById('projectYearFilter').value;
+    const filtered = projects.filter(p => {
+        const ms = !search || p.title.toLowerCase().includes(search) || p.company.toLowerCase().includes(search) || p.address.toLowerCase().includes(search);
+        const mr = !ref || p.references.includes(ref);
+        const mc = !cat || (function() {
+            const comp = companies.find(c => c.id === p.company_id);
+            return comp && comp.category === cat;
+        })();
+        const my = !year || p.year == year;
+        return ms && mr && mc && my;
+    });
+    const grid = document.getElementById('projectsList');
+    grid.innerHTML = '';
+    filtered.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        const hasPhotos = project.photos && project.photos.length > 0;
+        const thumbHtml = hasPhotos
+            ? '<img src="' + project.photos[0] + '" alt="' + project.title + '" onerror="this.style.display=\'none\';this.parentNode.insertAdjacentHTML(\'beforeend\',\'' + project.image + '\')">' + (project.photos.length > 1 ? '<div class="photo-counter">' + project.photos.length + ' photos</div>' : '')
+            : project.image;
+        card.innerHTML =
+            '<div class="project-image" style="position:relative">' + thumbHtml +
+                '<div class="project-year-badge">' + project.year + '</div>' +
+            '</div>' +
+            '<div class="project-content">' +
+                '<div class="project-title">' + project.title + '</div>' +
+                '<div class="project-company">' + project.company + '</div>' +
+                '<div class="project-address">ð ' + project.address + '</div>' +
+                '<div class="project-desc">' + project.description + '</div>' +
+                '<div class="project-tags">' + project.references.map(r => '<span class="detail-tag">' + r + '</span>').join('') + '</div>' +
+                '<button class="btn-map-link" onclick="goToProjectOnMap(' + project.id + ')">ð Voir sur la carte</button>' +
+            '</div>';
+        grid.appendChild(card);
+    });
+}
+
+// ===================== NAV TO MAP =====================
+function goToCompanyOnMap(companyId) {
+    const company = companies.find(c => c.id === companyId);
+    if (!company) return;
+    switchToTab('tab-trades');
+    setTimeout(() => {
+        maps.trades.setView([company.lat, company.lng], 13, {animate: true});
+        showCompanyDetail(company, 'detailTrades');
+    }, 300);
+}
+
+function goToProjectOnMap(projectId) {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    switchToTab('tab-references');
+    setTimeout(() => {
+        maps.references.setView([project.lat, project.lng], 13, {animate: true});
+        showProjectDetail(project, 'detailReferences');
+    }, 300);
+}
+
+// ===================== DETAIL PANELS =====================
+function showCompanyDetail(company, panelId) {
+    const color = tradeCategories[company.category] ? tradeCategories[company.category].color : '#999';
+    document.getElementById(panelId.replace('detail', 'detail') + 'Content').innerHTML =
+        '<div style="display:flex;align-items:center;margin-bottom:20px">' +
+            '<div class="company-avatar" style="background:' + color + ';width:60px;height:60px;font-size:24px;margin:0">' + company.name.charAt(0) + '</div>' +
+            '<div class="detail-title" style="margin:0 0 0 15px">' + company.name + '</div>' +
+        '</div>' +
+        '<div class="detail-field"><div class="detail-label">Domaine</div><div class="detail-value">' + company.category + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">MÃ©tier</div><div class="detail-value">' + company.trade + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-value">' + company.description + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Effectifs</div><div class="detail-value">' + company.employees + ' salariÃ©s, ' + company.associates + ' associÃ©s</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Chiffre d\'affaires</div><div class="detail-value">' + company.ca + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Adresse</div><div class="detail-value">' + company.address + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">TÃ©lÃ©phone</div><div class="detail-value">' + company.phone + '</div></div>' +
+        (company.rayon ? '<div class="detail-field"><div class="detail-label">PÃ©rimÃ¨tre local</div><div class="detail-value">' + company.rayon + ' km autour du siÃ¨ge</div></div>' : '') +
+        (company.zones ? '<div class="detail-field"><div class="detail-label">Zones d\'activitÃ©</div><div class="detail-value">' +
+            parseCompanyZones(company.zones).map(z => '<span class="detail-tag">' + z.label + '</span>').join('') +
+        '</div></div>' : '');
+    document.getElementById(panelId).classList.add('open');
+}
+
+function buildPhotoGallery(photos, projectId) {
+    if (!photos || photos.length === 0) return '';
+    const galleryId = 'gallery-' + projectId;
+    let html = '<div class="photo-gallery" id="' + galleryId + '">';
+    html += '<div class="photo-gallery-main" style="position:relative">';
+    html += '<img id="' + galleryId + '-main" src="' + photos[0] + '" alt="Photo 1">';
+    if (photos.length > 1) {
+        html += '<button class="photo-gallery-nav prev" onclick="galleryNav(\'' + galleryId + '\',-1)">â¹</button>';
+        html += '<button class="photo-gallery-nav next" onclick="galleryNav(\'' + galleryId + '\',1)">âº</button>';
+        html += '<div class="photo-counter" id="' + galleryId + '-counter">1 / ' + photos.length + '</div>';
+    }
+    html += '</div>';
+    if (photos.length > 1) {
+        html += '<div class="photo-gallery-thumbs">';
+        photos.forEach((url, i) => {
+            html += '<div class="photo-gallery-thumb' + (i === 0 ? ' active' : '') + '" onclick="galleryGoTo(\'' + galleryId + '\',' + i + ')">';
+            html += '<img src="' + url + '" alt="Photo ' + (i+1) + '">';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Stocker les photos des galeries pour la navigation
+window._galleryData = {};
+
+function galleryNav(galleryId, dir) {
+    const data = window._galleryData[galleryId];
+    if (!data) return;
+    data.index = (data.index + dir + data.photos.length) % data.photos.length;
+    galleryUpdate(galleryId);
+}
+
+function galleryGoTo(galleryId, index) {
+    const data = window._galleryData[galleryId];
+    if (!data) return;
+    data.index = index;
+    galleryUpdate(galleryId);
+}
+
+function galleryUpdate(galleryId) {
+    const data = window._galleryData[galleryId];
+    const mainImg = document.getElementById(galleryId + '-main');
+    const counter = document.getElementById(galleryId + '-counter');
+    if (mainImg) mainImg.src = data.photos[data.index];
+    if (counter) counter.textContent = (data.index + 1) + ' / ' + data.photos.length;
+    const thumbs = document.querySelectorAll('#' + galleryId + ' .photo-gallery-thumb');
+    thumbs.forEach((t, i) => t.classList.toggle('active', i === data.index));
+}
+
+function showProjectDetail(project, panelId) {
+    const company = companies.find(c => c.id === project.company_id);
+    const color = company && tradeCategories[company.category] ? tradeCategories[company.category].color : '#999';
+    const galleryId = 'gallery-' + project.id;
+    const hasPhotos = project.photos && project.photos.length > 0;
+    if (hasPhotos) window._galleryData[galleryId] = { photos: project.photos, index: 0 };
+    document.getElementById(panelId.replace('detail', 'detail') + 'Content').innerHTML =
+        '<div class="detail-title">' + project.title + '</div>' +
+        (hasPhotos ? buildPhotoGallery(project.photos, project.id) : '') +
+        '<div class="detail-field"><div class="detail-label">AnnÃ©e</div><div class="detail-value">' + project.year + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Entreprise</div><div class="detail-value" style="display:flex;align-items:center;gap:10px">' +
+            '<div class="company-avatar" style="background:' + color + ';width:40px;height:40px;font-size:16px;margin:0">' + (company ? company.name.charAt(0) : '?') + '</div>' +
+            project.company +
+        '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Adresse</div><div class="detail-value">' + project.address + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-value">' + project.description + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">CatÃ©gories</div><div class="detail-value">' +
+            project.references.map(r => '<span class="detail-tag">' + r + '</span>').join('') +
+        '</div></div>';
+    document.getElementById(panelId).classList.add('open');
+}
+
+// ===================== STATS =====================
+function updateStats(filtered) {
+    if (!filtered) filtered = companies;
+    document.getElementById('statsCompanies').textContent = filtered.length;
+    document.getElementById('statsEmployees').textContent = filtered.reduce((s, c) => s + c.employees, 0);
+    document.getElementById('statsAssociates').textContent = filtered.reduce((s, c) => s + c.associates, 0);
+}
+
+// ===================== CSV =====================
+function exportCompanies() {
+    let csv = '\uFEFFNom,Domaine,MÃ©tier,Description,SalariÃ©s,AssociÃ©s,CA,Adresse,TÃ©lÃ©phone,Latitude,Longitude,Zones,Rayon\n';
+    companies.forEach(c => {
+        csv += '"' + [c.name,c.category,c.trade,c.description,c.employees,c.associates,c.ca,c.address,c.phone,c.lat,c.lng,c.zones||'',c.rayon||''].join('","') + '"\n';
+    });
+    downloadCSV(csv, 'entreprises_quercus.csv');
+}
+
+function exportProjects() {
+    let csv = '\uFEFFTitre,CatÃ©gorie,Entreprise,Adresse,AnnÃ©e,Description,RÃ©fÃ©rences,Latitude,Longitude,Photo1,Photo2,Photo3,Photo4,Photo5\n';
+    projects.forEach(p => {
+        const ph = p.photos || [];
+        csv += '"' + [p.title,p.category,p.company,p.address,p.year,p.description,p.references.join(';'),p.lat,p.lng,ph[0]||'',ph[1]||'',ph[2]||'',ph[3]||'',ph[4]||''].join('","') + '"\n';
+    });
+    downloadCSV(csv, 'references_quercus.csv');
+}
+
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+
+function parseCSVLine(line) {
+    const result = []; let current = ''; let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+            if (ch === '"' && line[i+1] === '"') { current += '"'; i++; }
+            else if (ch === '"') { inQuotes = false; }
+            else { current += ch; }
+        } else {
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === ',') { result.push(current); current = ''; }
+            else { current += ch; }
+        }
+    }
+    result.push(current);
+    return result;
+}
+
+function importCompanies(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const lines = e.target.result.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const p = parseCSVLine(lines[i]);
+            if (p.length >= 7) {
+                companies.push({
+                    id: companies.length + 1, name: p[0], category: p[1], trade: p[2],
+                    description: p[3], employees: parseInt(p[4]) || 0, associates: parseInt(p[5]) || 0,
+                    ca: p[6] || '', address: p[7] || '', phone: p[8] || '',
+                    lat: parseFloat(p[9]) || (45.75 + Math.random()*2-1),
+                    lng: parseFloat(p[10]) || (4.85 + Math.random()*2-1),
+                    zones: p[11] || '',
+                    rayon: parseInt(p[12]) || 0
+                });
+            }
+        }
+        filterAndRenderCompanies();
+        filterAndRenderTrades();
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+function importProjects(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const lines = e.target.result.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const p = parseCSVLine(lines[i]);
+            if (p.length >= 5) {
+                projects.push({
+                    id: projects.length + 1, title: p[0], category: p[1], company_id: 1,
+                    company: p[2], address: p[3], year: parseInt(p[4]) || 2023,
+                    description: p[5] || '', image: 'ðï¸',
+                    references: (p[6] || '').split(';').filter(r => r.trim()),
+                    lat: parseFloat(p[7]) || (45.75 + Math.random()*2-1),
+                    lng: parseFloat(p[8]) || (4.85 + Math.random()*2-1)
+                });
+            }
+        }
+        filterAndRenderProjects();
+        filterAndRenderReferences();
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+// ===================== START =====================
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
