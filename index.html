@@ -316,6 +316,13 @@
                         <div class="zones-toggle-hint">Afficher les zones géographiques</div>
                     </div>
                 </div>
+                <div class="zones-toggle" id="quercusToggle" onclick="toggleQuercusFilter()" style="border-left:4px solid #2d6a4f;">
+                    <div class="zones-toggle-cb" id="quercusToggleCb" style="background:#eee;color:transparent;">✓</div>
+                    <div>
+                        <div class="zones-toggle-label">Associés Quercus uniquement</div>
+                        <div class="zones-toggle-hint">Filtrer les associés Quercus Coopération</div>
+                    </div>
+                </div>
                 <div class="categories" id="tradesCategories"></div>
                 <div class="stats-bar">
                     <div class="stat-item"><span>Entreprises affichées</span><span class="stat-value" id="statsCompanies">0</span></div>
@@ -333,7 +340,7 @@
         </div>
     </div>
 
-    <!-- Tab 2: Carte Références (masqué) -->
+    <!-- Tab 2: Carte Références (masqué par décision comité coopératif) -->
     <div id="tab-references" class="tab-content" style="display:none !important;">
         <div class="map-container">
             <div class="sidebar">
@@ -395,7 +402,7 @@
         </div>
     </div>
 
-    <!-- Tab 4: Liste Références (masqué) -->
+    <!-- Tab 4: Liste Références (masqué par décision comité coopératif) -->
     <div id="tab-projects" class="tab-content" style="display:none !important;">
         <div class="list-container">
             <div class="list-toolbar">
@@ -580,7 +587,9 @@ function mapSheetToCompanies(rows) {
         lat: parseFloat(String(row['Latitude']).replace(',', '.')) || 45.75,
         lng: parseFloat(String(row['Longitude']).replace(',', '.')) || 4.85,
         zones: row['Zones'] || '',
-        rayon: parseInt(row['Rayon']) || 0
+        rayon: parseInt(row['Rayon']) || 0,
+        website: row['Site Internet'] || '',
+        quercus: (row['Associé Quercus'] || '').toString().trim().toUpperCase() === 'OUI'
     })).filter(c => c.name);
 }
 
@@ -941,12 +950,21 @@ function populateAllFilters() {
 }
 
 // ===================== FILTER + RENDER =====================
+var quercusFilterActive = false;
+function toggleQuercusFilter() {
+    quercusFilterActive = !quercusFilterActive;
+    var cb = document.getElementById('quercusToggleCb');
+    cb.style.background = quercusFilterActive ? '#2d6a4f' : '#eee';
+    cb.style.color = quercusFilterActive ? '#fff' : 'transparent';
+    filterAndRenderTrades();
+}
 function getFilteredCompanies() {
     const search = document.getElementById('tradesSearch').value.toLowerCase();
     return companies.filter(c => {
         const matchSearch = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || (c.metiersSecondaires||'').toLowerCase().includes(search) || (c.competences||'').toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
         const matchTrade = selectedFilters.trades.size === 0 || selectedFilters.trades.has(c.trade);
-        return matchSearch && matchTrade;
+        const matchQuercus = !quercusFilterActive || c.quercus;
+        return matchSearch && matchTrade && matchQuercus;
     });
 }
 
@@ -1036,6 +1054,8 @@ function filterAndRenderCompanies() {
             (company.competences ? '<div style="margin:4px 0;font-size:12px;color:#e37142;"><strong>Compétences :</strong> ' + company.competences + '</div>' : '') +
             '<div class="company-desc">' + company.description + '</div>' +
             '<div class="company-meta"><span>👥 ' + company.employees + ' sal.</span><span>🤝 ' + company.associates + ' assoc.</span><span>💰 ' + company.ca + '</span></div>' +
+            (company.website ? '<div style="margin:4px 0;font-size:13px;">🌐 <a href="https://' + company.website + '" target="_blank" rel="noopener" style="color:#2d6a4f;">' + company.website + '</a></div>' : '') +
+            (company.quercus ? '<div style="margin:4px 0;font-size:12px;"><span style="background:#2d6a4f;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;">✓ Associé Quercus</span></div>' : '') +
             '<div class="company-address">📍 ' + company.address + '</div>' +
             '<button class="btn-map-link" onclick="goToCompanyOnMap(' + company.id + ')">📍 Voir sur la carte</button>';
         list.appendChild(card);
@@ -1118,6 +1138,8 @@ function showCompanyDetail(company, panelId) {
         '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-value">' + company.description + '</div></div>' +
         '<div class="detail-field"><div class="detail-label">Effectifs</div><div class="detail-value">' + company.employees + ' salariés, ' + company.associates + ' associés</div></div>' +
         '<div class="detail-field"><div class="detail-label">Chiffre d\'affaires</div><div class="detail-value">' + company.ca + '</div></div>' +
+        (company.website ? '<div class="detail-field"><div class="detail-label">Site Internet</div><div class="detail-value"><a href="https://' + company.website + '" target="_blank" rel="noopener" style="color:#2d6a4f;text-decoration:underline;">' + company.website + '</a></div></div>' : '') +
+        (company.quercus ? '<div class="detail-field"><div class="detail-label">Statut</div><div class="detail-value"><span style="background:#2d6a4f;color:#fff;padding:4px 12px;border-radius:12px;font-size:13px;">✓ Associé Quercus Coopération</span></div></div>' : '') +
         '<div class="detail-field"><div class="detail-label">Adresse</div><div class="detail-value">' + company.address + '</div></div>' +
         '<div class="detail-field"><div class="detail-label">Téléphone</div><div class="detail-value">' + company.phone + '</div></div>' +
         (company.rayon ? '<div class="detail-field"><div class="detail-label">Périmètre local</div><div class="detail-value">' + company.rayon + ' km autour du siège</div></div>' : '') +
@@ -1211,9 +1233,9 @@ function updateStats(filtered) {
 
 // ===================== CSV =====================
 function exportCompanies() {
-    let csv = '\uFEFFNom,Domaine,Métier principal,Métiers secondaires,Compétences,Description,Salariés,Associés,CA,Adresse,Téléphone,Latitude,Longitude,Zones,Rayon\n';
+    let csv = '\uFEFFNom,Domaine,Métier principal,Métiers secondaires,Compétences,Description,Salariés,Associés,CA,Site Internet,Associé Quercus,Adresse,Téléphone,Latitude,Longitude,Zones,Rayon\n';
     companies.forEach(c => {
-        csv += '"' + [c.name,c.category,c.trade,c.metiersSecondaires||'',c.competences||'',c.description,c.employees,c.associates,c.ca,c.address,c.phone,c.lat,c.lng,c.zones||'',c.rayon||''].join('","') + '"\n';
+        csv += '"' + [c.name,c.category,c.trade,c.metiersSecondaires||'',c.competences||'',c.description,c.employees,c.associates,c.ca,c.website||'',c.quercus?'Oui':'Non',c.address,c.phone,c.lat,c.lng,c.zones||'',c.rayon||''].join('","') + '"\n';
     });
     downloadCSV(csv, 'entreprises_quercus.csv');
 }
