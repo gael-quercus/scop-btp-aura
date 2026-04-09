@@ -297,9 +297,7 @@
         </div>
         <div class="tabs">
             <button class="tab-button active" data-tab="tab-trades">Carte Métiers</button>
-            <button class="tab-button" data-tab="tab-references">Carte Références</button>
             <button class="tab-button" data-tab="tab-companies">Liste Entreprises</button>
-            <button class="tab-button" data-tab="tab-projects">Liste Références</button>
         </div>
     </div>
 
@@ -335,8 +333,8 @@
         </div>
     </div>
 
-    <!-- Tab 2: Carte Références -->
-    <div id="tab-references" class="tab-content">
+    <!-- Tab 2: Carte Références (masqué) -->
+    <div id="tab-references" class="tab-content" style="display:none !important;">
         <div class="map-container">
             <div class="sidebar">
                 <div id="fileWarningRefs"></div>
@@ -397,8 +395,8 @@
         </div>
     </div>
 
-    <!-- Tab 4: Liste Références -->
-    <div id="tab-projects" class="tab-content">
+    <!-- Tab 4: Liste Références (masqué) -->
+    <div id="tab-projects" class="tab-content" style="display:none !important;">
         <div class="list-container">
             <div class="list-toolbar">
                 <div class="list-toolbar-row">
@@ -570,15 +568,17 @@ function mapSheetToCompanies(rows) {
         id: parseInt(row['ID']) || (idx + 1),
         name: row['Nom'] || '',
         category: row['Domaine'] || '',
-        trade: row['Métier'] || '',
+        trade: row['Métier principal'] || row['Métier'] || '',
+        metiersSecondaires: row['Métiers secondaires'] || '',
+        competences: row['Compétences'] || '',
         description: row['Description'] || '',
         employees: parseInt(row['Salariés']) || 0,
         associates: parseInt(row['Associés']) || 0,
         ca: row['CA'] || '',
         address: row['Adresse'] || '',
         phone: row['Téléphone'] || '',
-        lat: parseFloat(row['Latitude']) || 45.75,
-        lng: parseFloat(row['Longitude']) || 4.85,
+        lat: parseFloat(String(row['Latitude']).replace(',', '.')) || 45.75,
+        lng: parseFloat(String(row['Longitude']).replace(',', '.')) || 4.85,
         zones: row['Zones'] || '',
         rayon: parseInt(row['Rayon']) || 0
     })).filter(c => c.name);
@@ -944,7 +944,7 @@ function populateAllFilters() {
 function getFilteredCompanies() {
     const search = document.getElementById('tradesSearch').value.toLowerCase();
     return companies.filter(c => {
-        const matchSearch = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
+        const matchSearch = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || (c.metiersSecondaires||'').toLowerCase().includes(search) || (c.competences||'').toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
         const matchTrade = selectedFilters.trades.size === 0 || selectedFilters.trades.has(c.trade);
         return matchSearch && matchTrade;
     });
@@ -1017,7 +1017,7 @@ function filterAndRenderCompanies() {
     const cat = document.getElementById('companyCategoryFilter').value;
     const trade = document.getElementById('companyTradeFilter').value;
     const filtered = companies.filter(c => {
-        const ms = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
+        const ms = !search || c.name.toLowerCase().includes(search) || c.trade.toLowerCase().includes(search) || (c.metiersSecondaires||'').toLowerCase().includes(search) || (c.competences||'').toLowerCase().includes(search) || c.address.toLowerCase().includes(search);
         const mc = !cat || c.category === cat;
         const mt = !trade || c.trade === trade;
         return ms && mc && mt;
@@ -1032,6 +1032,8 @@ function filterAndRenderCompanies() {
             '<div class="company-avatar" style="background:' + color + ';">' + company.name.charAt(0) + '</div>' +
             '<div class="company-name">' + company.name + '</div>' +
             '<div class="company-trade">' + company.trade + ' — ' + company.category + '</div>' +
+            (company.metiersSecondaires ? '<div style="margin:4px 0;font-size:12px;color:#555;"><strong>Métiers secondaires :</strong> ' + company.metiersSecondaires + '</div>' : '') +
+            (company.competences ? '<div style="margin:4px 0;font-size:12px;color:#e37142;"><strong>Compétences :</strong> ' + company.competences + '</div>' : '') +
             '<div class="company-desc">' + company.description + '</div>' +
             '<div class="company-meta"><span>👥 ' + company.employees + ' sal.</span><span>🤝 ' + company.associates + ' assoc.</span><span>💰 ' + company.ca + '</span></div>' +
             '<div class="company-address">📍 ' + company.address + '</div>' +
@@ -1110,7 +1112,9 @@ function showCompanyDetail(company, panelId) {
             '<div class="detail-title" style="margin:0 0 0 15px">' + company.name + '</div>' +
         '</div>' +
         '<div class="detail-field"><div class="detail-label">Domaine</div><div class="detail-value">' + company.category + '</div></div>' +
-        '<div class="detail-field"><div class="detail-label">Métier</div><div class="detail-value">' + company.trade + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Métier principal</div><div class="detail-value">' + company.trade + '</div></div>' +
+        (company.metiersSecondaires ? '<div class="detail-field"><div class="detail-label">Métiers secondaires</div><div class="detail-value">' + company.metiersSecondaires.split(';').map(function(m){return '<span class="detail-tag" style="background:#f0f7f0;color:#2d6a4f;margin:2px 4px 2px 0;padding:3px 8px;border-radius:12px;display:inline-block;font-size:12px;">' + m.trim() + '</span>';}).join('') + '</div></div>' : '') +
+        (company.competences ? '<div class="detail-field"><div class="detail-label">Compétences</div><div class="detail-value">' + company.competences.split(';').map(function(c){return '<span class="detail-tag" style="background:#fff3e0;color:#e37142;margin:2px 4px 2px 0;padding:3px 8px;border-radius:12px;display:inline-block;font-size:12px;">' + c.trim() + '</span>';}).join('') + '</div></div>' : '') +
         '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-value">' + company.description + '</div></div>' +
         '<div class="detail-field"><div class="detail-label">Effectifs</div><div class="detail-value">' + company.employees + ' salariés, ' + company.associates + ' associés</div></div>' +
         '<div class="detail-field"><div class="detail-label">Chiffre d\'affaires</div><div class="detail-value">' + company.ca + '</div></div>' +
@@ -1207,9 +1211,9 @@ function updateStats(filtered) {
 
 // ===================== CSV =====================
 function exportCompanies() {
-    let csv = '\uFEFFNom,Domaine,Métier,Description,Salariés,Associés,CA,Adresse,Téléphone,Latitude,Longitude,Zones,Rayon\n';
+    let csv = '\uFEFFNom,Domaine,Métier principal,Métiers secondaires,Compétences,Description,Salariés,Associés,CA,Adresse,Téléphone,Latitude,Longitude,Zones,Rayon\n';
     companies.forEach(c => {
-        csv += '"' + [c.name,c.category,c.trade,c.description,c.employees,c.associates,c.ca,c.address,c.phone,c.lat,c.lng,c.zones||'',c.rayon||''].join('","') + '"\n';
+        csv += '"' + [c.name,c.category,c.trade,c.metiersSecondaires||'',c.competences||'',c.description,c.employees,c.associates,c.ca,c.address,c.phone,c.lat,c.lng,c.zones||'',c.rayon||''].join('","') + '"\n';
     });
     downloadCSV(csv, 'entreprises_quercus.csv');
 }
